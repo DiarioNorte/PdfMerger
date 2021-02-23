@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
+using System.Diagnostics;
+using System.Data;
 
 namespace PdfMerger
 {
@@ -12,34 +14,79 @@ namespace PdfMerger
 
         static void Main(string[] args)
         {
-            string newestFolder = NewestFolder();
+            System.Console.WriteLine(" Ingresa 3 rutas, a carpetas como argumentos: 1-origen 2-destino 3-destino de comprimidos . No llevan comillas, los args solo se separan por espacios.");
+            string newestFolder = NewestFolder(args[0]);
 
-            MergeFilesInFolder(newestFolder);
+            MergeFilesInFolder(newestFolder, args[1], args[2]);
         }
 
-        public static string NewestFolder()// Busca la carpeta "día" que contiene el diario a hacer merge
+        public static string NewestFolder(string origen)// Busca la carpeta "día" que contiene el diario a hacer merge
         {
             List<byte[]> sourceFiles = new List<byte[]>();
 
-            string startFolder = @"C:\Users\victo\Desktop\abuelo";//Escrbir el path de la carpeta madre donde se anidaran las carpetas con las ediciones "deshojadas". No hace falta que sea la carpeta del mes, puede ser la que contiene los meses
+            //origen es carpeta madre donde se anidaran las carpetas con las ediciones "deshojadas". No hace falta que sea la carpeta del mes, puede ser la que contiene los meses
 
             // Toma una instantanea del directorio  
-            System.IO.DirectoryInfo dir = new System.IO.DirectoryInfo(startFolder);
+            System.IO.DirectoryInfo dir = new System.IO.DirectoryInfo(@origen);
+
+            DateTime today = DateTime.Now;
+
+            var año = today.Year;
+            string mes;
+            string dia;
+
+            if (today.Month <= 9)
+            {
+                mes = "0" + today.Month;
+            }
+            else
+            {
+                mes = today.Month.ToString();
+            }
+
+            if (today.Day <= 9)
+            {
+                dia = "0" + today.Day;
+            }
+            else
+            {
+                dia = today.Day.ToString();
+            }
+
+
+            string folderName = "PDF " + dia + "-" + mes + "-" + año;
+                      
 
             IEnumerable<System.IO.FileInfo> fileList = dir.GetFiles("*.*", System.IO.SearchOption.AllDirectories);
 
             //filtro los archivos pdf de todos los direcctorios y los ordeno por fecha de creación
             IEnumerable<System.IO.FileInfo> fileQuery =
                 from file in fileList
-                where file.Extension == ".pdf"
+                where file.Extension == ".pdf" && file.Directory.Name==folderName
                 orderby file.CreationTime
                 select file;
 
-            //tomo el archivo más reciente
-            var newestFile = fileQuery.Last();
+            string folderPath;
+            if (fileQuery.Any())
+            {
+                //tomo el archivo más reciente
+                var newestFile = fileQuery.Last();
+                string nombreCarpeta = newestFile.Directory.Name.Substring(0, 3);
+                
 
-            //tomo el directorio padre de el archivo más reciente. Es el directorio en el que voy a hacer merge.
-            var folderPath = newestFile.Directory.FullName;
+                if (nombreCarpeta == "PDF")
+                {
+                    folderPath = newestFile.Directory.FullName; //Esto es para evitar las carpetas de suplementos
+                }
+                else
+                {
+                    folderPath = newestFile.Directory.Parent.FullName;
+                }
+            }
+            else
+            {
+                folderPath = "";                
+            }
 
             return folderPath;
 
@@ -49,32 +96,44 @@ namespace PdfMerger
 
 
 
-        public static void MergeFilesInFolder(string folderPath)// Hace busca los pdf de una carpeta y los  guarda ya unidos en un destino con el nombre ingresado
+        public static void MergeFilesInFolder(string folderPath, string destino, string comprimidos)// Hace busca los pdf de una carpeta y los  guarda ya unidos en un destino con el nombre ingresado
         {
-            List<byte[]> sourceFiles = new List<byte[]>();
+            if(folderPath!="")
+            {
+                List<byte[]> sourceFiles = new List<byte[]>();
 
-            // MergeFilesInFolder
-            System.IO.DirectoryInfo dir = new System.IO.DirectoryInfo(folderPath);
+                // MergeFilesInFolder
+                System.IO.DirectoryInfo dir = new System.IO.DirectoryInfo(folderPath);
 
-            IEnumerable<System.IO.FileInfo> fileList = dir.GetFiles("*.*", System.IO.SearchOption.AllDirectories);
+                IEnumerable<System.IO.FileInfo> fileList = dir.GetFiles("*.*", System.IO.SearchOption.AllDirectories);
 
-            IEnumerable<System.IO.FileInfo> fileQuery =
-                from file in fileList
-                where file.Extension == ".pdf"
+                IEnumerable<System.IO.FileInfo> fileQuery =
+                    from file in fileList
+                    where file.Extension == ".pdf"
                 //where file.Directory.Name == "PDF 02-01-2020"
                 orderby file.Name
-                select file;
+                    select file;
 
-            foreach (System.IO.FileInfo fi in fileQuery)
-            {
-                Console.WriteLine(fi.FullName);
+                foreach (System.IO.FileInfo fi in fileQuery)
+                {
+                    Console.WriteLine(fi.FullName);
 
-                sourceFiles.Add(System.IO.File.ReadAllBytes(fi.FullName));
+                    sourceFiles.Add(System.IO.File.ReadAllBytes(fi.FullName));
 
+                }
+
+                byte[] newPdf = MergeFiles(sourceFiles);
+
+                System.IO.File.WriteAllBytes(@destino + "\\" + dir.Name + ".pdf", newPdf);//setear destino
+
+
+                string origenComp = @destino + "//" + @dir.Name + ".pdf";
+                string destinoComp = @comprimidos + "//" + dir.Name + ".pdf";
+
+
+
+                CompressPDF(@origenComp, @destinoComp, "screen");
             }
-
-            byte[] newPdf = MergeFiles(sourceFiles);
-            System.IO.File.WriteAllBytes(@"C:\Users\victo\Desktop\destino\"+dir.Name+".pdf", newPdf);//setear destino
 
         }
 
@@ -131,8 +190,44 @@ namespace PdfMerger
                 return ms.GetBuffer();
             }
         }
-        
-    
+
+        //compression https://www.youtube.com/watch?v=8oc0_w8m640&ab_channel=C%23CodersByH-educate
+        //dependencias ghost.exe y gsdll32.dll - ghostscript - bin/debug -bin/release
+        private static bool CompressPDF(string InputFile, string OutPutFile, string CompressValue)
+        {
+            try
+            {
+                Process proc = new Process();
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.CreateNoWindow = true;
+                psi.ErrorDialog = false;
+                psi.UseShellExecute = false;
+                psi.WindowStyle = ProcessWindowStyle.Hidden;
+                psi.FileName = "ghsot.exe";
+
+
+                string args = "-sDEVICE=pdfwrite -dCompatibilityLevel=1.4" + " -dPDFSETTINGS=/" + CompressValue + " -dNOPAUSE  -dQUIET -dBATCH" + " -sOutputFile=\"" + OutPutFile + "\" " + "\"" + InputFile + "\"";
+
+
+                psi.Arguments = args;
+
+
+                //start the execution
+                proc.StartInfo = psi;
+
+                proc.Start();
+                proc.WaitForExit();
+
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+
 
     }
 }

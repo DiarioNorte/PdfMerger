@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PdfMerger": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\victo\\Desktop\\origen C:\\Users\\victo\\Desktop\\dest C:\\Users\\victo\\Desktop\\comp"
+    }
+  }
+}
