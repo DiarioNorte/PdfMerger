@@ -2,7 +2,7 @@
   "profiles": {
     "PdfMerger": {
       "commandName": "Project",
-      "commandLineArgs": "C:\\Users\\victo\\Desktop\\origen C:\\Users\\victo\\Desktop\\dest C:\\Users\\victo\\Desktop\\comp"
+      "commandLineArgs": "C:\\Users\\victo\\Desktop\\hoy C:\\Users\\victo\\Desktop\\dest C:\\Users\\victo\\Desktop\\comp C:\\Users\\victo\\Desktop\\paginas"
     }
   }
 }

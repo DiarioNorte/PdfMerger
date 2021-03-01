@@ -14,13 +14,21 @@ namespace PdfMerger
 
         static void Main(string[] args)
         {
-            System.Console.WriteLine(" Ingresa 3 rutas, a carpetas como argumentos: 1-origen 2-destino 3-destino de comprimidos . No llevan comillas, los args solo se separan por espacios.");
-            string newestFolder = NewestFolder(args[0]);
 
-            MergeFilesInFolder(newestFolder, args[1], args[2]);
+            string origen = args[0];
+            string destinoOriginales = args[1];
+            string destinoComprimidos = args[2];
+            string destinoPaginas = args[3];
+
+            System.Console.WriteLine(" Ingresa 3 rutas, a carpetas como argumentos: 1-origen 2-destino 3-destino de comprimidos . No llevan comillas, los args solo se separan por espacios.");
+            string targetFolder = TargetFolder(origen);
+
+            MergeFilesInFolder(targetFolder, destinoOriginales, destinoComprimidos,destinoPaginas);
+
+  
         }
 
-        public static string NewestFolder(string origen)// Busca la carpeta "día" que contiene el diario a hacer merge
+        public static string TargetFolder(string origen)// Busca la carpeta "día" que contiene el diario a hacer merge
         {
             List<byte[]> sourceFiles = new List<byte[]>();
 
@@ -88,6 +96,8 @@ namespace PdfMerger
                 folderPath = "";                
             }
 
+
+
             return folderPath;
 
         }
@@ -96,16 +106,16 @@ namespace PdfMerger
 
 
 
-        public static void MergeFilesInFolder(string folderPath, string destino, string comprimidos)// Hace busca los pdf de una carpeta y los  guarda ya unidos en un destino con el nombre ingresado
+        public static void MergeFilesInFolder(string folderPath, string destino, string comprimidos, string paginas)// Hace busca los pdf de una carpeta y los  guarda ya unidos en un destino con el nombre ingresado
         {
             if(folderPath!="")
             {
                 List<byte[]> sourceFiles = new List<byte[]>();
 
                 // MergeFilesInFolder
-                System.IO.DirectoryInfo dir = new System.IO.DirectoryInfo(folderPath);
+                System.IO.DirectoryInfo dir1 = new System.IO.DirectoryInfo(folderPath);
 
-                IEnumerable<System.IO.FileInfo> fileList = dir.GetFiles("*.*", System.IO.SearchOption.AllDirectories);
+                IEnumerable<System.IO.FileInfo> fileList = dir1.GetFiles("*.*", System.IO.SearchOption.AllDirectories);
 
                 IEnumerable<System.IO.FileInfo> fileQuery =
                     from file in fileList
@@ -124,15 +134,20 @@ namespace PdfMerger
 
                 byte[] newPdf = MergeFiles(sourceFiles);
 
-                System.IO.File.WriteAllBytes(@destino + "\\" + dir.Name + ".pdf", newPdf);//setear destino
+                System.IO.File.WriteAllBytes(@destino + "\\" + dir1.Name + ".pdf", newPdf);//setear destino
 
 
-                string origenComp = @destino + "//" + @dir.Name + ".pdf";
-                string destinoComp = @comprimidos + "//" + dir.Name + ".pdf";
-
-
+                string origenComp = @destino + "//" + dir1.Name + ".pdf";
+                string destinoComp = @comprimidos + "//" + dir1.Name + ".pdf";
 
                 CompressPDF(@origenComp, @destinoComp, "screen");
+
+
+                string destinoCopy = @paginas + "//" + dir1.Name;
+
+        
+                System.IO.DirectoryInfo dir2 = new System.IO.DirectoryInfo(@destinoCopy);
+                CopyAll(dir1, dir2);
             }
 
         }
@@ -190,6 +205,32 @@ namespace PdfMerger
                 return ms.GetBuffer();
             }
         }
+
+        public static void CopyAll(DirectoryInfo source, DirectoryInfo target)
+        {
+            
+
+            Directory.CreateDirectory(target.FullName);
+
+            // Copy each file into the new directory.
+            foreach (FileInfo fi in source.GetFiles())
+            {
+                Console.WriteLine(@"Copying {0}\{1}", target.FullName, fi.Name);
+                fi.CopyTo(Path.Combine(target.FullName, fi.Name), true);
+            }
+
+            // Copy each subdirectory using recursion.
+            foreach (DirectoryInfo diSourceSubDir in source.GetDirectories())
+            {
+                DirectoryInfo nextTargetSubDir =
+                    target.CreateSubdirectory(diSourceSubDir.Name);
+                CopyAll(diSourceSubDir, nextTargetSubDir);
+            }
+        }
+
+
+
+  
 
         //compression https://www.youtube.com/watch?v=8oc0_w8m640&ab_channel=C%23CodersByH-educate
         //dependencias ghost.exe y gsdll32.dll - ghostscript - bin/debug -bin/release
